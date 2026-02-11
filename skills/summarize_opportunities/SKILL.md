@@ -14,11 +14,17 @@ Produce a well-structured text report of all currently tracked opportunities.
 
 ## Procedure
 
-1. **Read Active Opportunities**: Use `storage` to list and read from `opportunities/` directory
+1. **Read Scored Opportunities**: Use `storage` to read `opportunities/active_scored.json` (produced by opportunity_scorer)
 
 2. **Read Patterns**: Use `storage` to read `patterns/known_patterns.json`
 
 3. **Read Today's Scans**: Use `storage` to read `scans/daily_log.json`
+
+4. **Read Analytical Context**:
+   - `regime/current_regime.json` (regime status per asset)
+   - `correlation/current_correlations.json` (correlation risk assessment)
+   - `macro/current_triggers.json` (active macro triggers)
+   - `postmortem/hit_rates.json` (accuracy statistics)
 
 4. **Compile Report**:
 
@@ -29,13 +35,15 @@ Produce a well-structured text report of all currently tracked opportunities.
 ━━━ Active Opportunities ━━━
 
 🔵 #1: [Type] - [Asset]
-   Direction: [Bullish/Bearish]
-   Confidence: [X/10] ████████░░
-   Impact: [X/10]
-   Timeframe: [short/medium/long]
-   Key Levels: [support] → [resistance]
-   Reasoning: [brief explanation]
-   Status: [new/developing/mature]
+     Direction: [Bullish/Bearish]
+     Confidence: [X/10] ████████░░
+     Impact: [X/10]
+     Timeframe: [short/medium/long]
+     Key Levels: [support] → [resistance]
+     Regime: [Trend-up/Trend-down/Range-bound]
+     Score Breakdown: [trend: +X, vol: +X, corr: +X, macro: +X, carry: +X]
+     Reasoning: [brief explanation]
+     Status: [new/developing/mature]
 
 🔵 #2: [Type] - [Asset]
    ...

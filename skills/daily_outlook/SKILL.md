@@ -15,7 +15,7 @@ Generate a comprehensive morning briefing covering all major markets, upcoming e
 ## Procedure
 
 1. **Gather Market Data**:
-   - Use `market_data` with `multi_ticker` for: BTCUSDT, ETHUSDT, SOLUSDT, XAUUSDT, EURUSDT, GBPUSDT
+   - Use `market_data` with `multi_ticker` for: BTCUSDT, ETHUSDT, SOLUSDT, XAUUSD, EURUSDT, GBPUSDT
    - Use `market_data` with `forex` for USD rates
    - Use `market_data` with `candles` for BTC (1d interval, 7 candles) to get weekly trend
 
@@ -25,9 +25,17 @@ Generate a comprehensive morning briefing covering all major markets, upcoming e
 
 3. **Review Yesterday's Data**:
    - Use `storage` to read `scans/daily_log.json` for yesterday's scans
-   - Use `storage` to read `opportunities/` for any active opportunities
+   - Use `storage` to read `opportunities/active_scored.json` for scored active opportunities
 
-4. **Review Memory**: Read `memory/MEMORY.md` for context and patterns
+4. **Read Analytical Skill Outputs**:
+   - `regime/current_regime.json` (from trend_regime_filter) — regime per asset
+   - `volatility/current_noise_profile.json` (from volatility_noise_filter) — vol status
+   - `correlation/current_correlations.json` (from cross_asset_correlation) — cluster summary
+   - `macro/current_triggers.json` (from event_macro_trigger) — active triggers & upcoming events
+   - `carry/current_carry_regime.json` (from trend_carry_regime) — carry alignment
+   - `postmortem/hit_rates.json` (from post_mortem) — recent accuracy
+
+5. **Review Memory**: Read `memory/MEMORY.md` for context and patterns
 
 5. **Compose the Report** in this format:
 
@@ -61,7 +69,25 @@ Gold: $X,XXX (▲/▼ X.X%)
 • [Thing to watch #2]
 
 ━━━ ⚠️ ACTIVE OPPORTUNITIES ━━━
-[List any active opportunities from detect_opportunity]
+[List scored opportunities from opportunity_scorer - max top 3]
+
+━━━ 📈 REGIME STATUS ━━━
+[Per asset: Trend-up/Trend-down/Range-bound + strength from trend_regime_filter]
+
+━━━ 📉 VOLATILITY STATUS ━━━
+[Vol regime: High/Normal/Low + any assets with elevated z-scores]
+
+━━━ 🔗 CORRELATION STATUS ━━━
+[Cluster summary + any correlation shifts from cross_asset_correlation]
+
+━━━ 🏛️ MACRO TRIGGERS ━━━
+[Active triggers + upcoming high-impact events from event_macro_trigger]
+
+━━━ 💹 CARRY ALIGNMENT ━━━
+[Carry-supported trends vs carry-opposed from trend_carry_regime]
+
+━━━ 📊 ACCURACY TRACKER ━━━
+[Recent hit rate from post_mortem if available]
 
 📝 Note: For informational purposes only. Not financial advice.
 ```

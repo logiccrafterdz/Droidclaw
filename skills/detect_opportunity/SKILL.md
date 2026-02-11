@@ -16,33 +16,48 @@ Analyze the latest market scan data and news to identify potential opportunities
 
 1. **Read Latest Scan**: Use `storage` tool to read from `scans/daily_log.json` (get recent entries)
 
-2. **Read Memory**: Use `read_file` to check `memory/MEMORY.md` for known patterns and past observations
+2. **Read Analytical Skill Outputs** (prerequisite data from quantitative skills):
+   - `regime/current_regime.json` (from trend_regime_filter) — check regime tags
+   - `volatility/current_noise_profile.json` (from volatility_noise_filter) — check signal vs noise
+   - `correlation/current_correlations.json` (from cross_asset_correlation) — check divergences
+   - `macro/current_triggers.json` (from event_macro_trigger) — check active triggers
 
-3. **Read Past Patterns**: Use `storage` to read `patterns/known_patterns.json` if it exists
+3. **Read Memory**: Use `read_file` to check `memory/MEMORY.md` for known patterns and past observations
 
-4. **Cross-Reference Analysis**:
+4. **Read Past Patterns**: Use `storage` to read `patterns/known_patterns.json` if it exists
+
+5. **Pre-Filter with Regime & Noise Data**:
+   - Do NOT generate "trend continuation" opportunities for assets where regime = "Range-bound"
+   - Do NOT generate opportunities where the current move is classified as "normal_move" (z_score < 1.0) unless there is a strong macro trigger
+   - DO flag "divergence" opportunities when cross_asset_correlation shows correlation_breakdown
+
+6. **Cross-Reference Analysis**:
    - Compare current prices with 24h and 7d trends
-   - Look for divergences between correlated assets (BTC vs ETH, Gold vs USD)
-   - Check if news events align with price movements
-   - Identify support/resistance levels being tested
+   - Look for divergences between correlated assets (use correlation data, not just BTC vs ETH)
+   - Check if news events align with price movements (use macro triggers)
+   - Identify support/resistance levels being tested (use Donchian channels from regime data)
    - Check for unusual volume-price divergences
 
-5. **Pattern Matching**: Compare current conditions with known patterns:
-   - **Breakout**: Price breaking above/below key levels with high volume
-   - **Divergence**: Correlated assets moving in opposite directions
-   - **News-Driven**: Significant news with delayed price reaction
-   - **Accumulation**: Low volatility with increasing volume
+7. **Pattern Matching**: Compare current conditions with known patterns:
+   - **Breakout**: Price breaking above/below key levels with high volume AND regime supports direction
+   - **Divergence**: Correlated assets moving in opposite directions (confirmed by correlation monitor)
+   - **News-Driven**: Significant news with delayed price reaction (confirmed by macro trigger)
+   - **Accumulation**: Low volatility with increasing volume (vol regime = "low")
    - **Distribution**: High volatility with decreasing volume after a run
 
-6. **Score Each Opportunity**:
-   - Confidence: 1-10 (how certain is the pattern)
+8. **Generate Raw Opportunities** (preliminary scoring only):
+   - Confidence: 1-10 (preliminary - will be refined by opportunity_scorer)
    - Impact: 1-10 (potential size of the move)
    - Timeframe: short (hours), medium (days), long (weeks)
    - Category: crypto, forex, commodity, macro
+   - Include which analytical signals support/contradict
 
-7. **Save Findings**: Use `storage` tool to:
-   - Write detailed analysis to `opportunities/YYYY-MM-DD.json`
-   - Append to `opportunities/history.json`
+9. **Save Raw Findings**: Use `storage` tool to:
+   - Write raw analysis to `opportunities/raw_YYYY-MM-DD.json`
+   - These will be picked up by **opportunity_scorer** for systematic scoring and filtering
+   - Also append to `opportunities/history.json`
+
+10. **Trigger Opportunity Scorer**: After saving raw opportunities, the opportunity_scorer skill should be invoked to apply systematic scoring and produce the final filtered list.
 
 ## Output Format
 

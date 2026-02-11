@@ -15,7 +15,7 @@ Perform a comprehensive scan of major markets to detect significant price moveme
 ## Procedure
 
 1. **Get Multi-Ticker Data**: Use the `market_data` tool with action `multi_ticker` and symbols:
-   `["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "XAUUSDT", "EURUSDT", "GBPUSDT"]`
+   `["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "XAUUSD", "EURUSDT", "GBPUSDT"]`
 
 2. **Get Forex Rates**: Use `market_data` with action `forex` and symbol `USD`
 

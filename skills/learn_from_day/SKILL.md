@@ -18,9 +18,19 @@ End-of-day reflection that reviews market events, validates or invalidates earli
 
 1. **Read Today's Scans**: Use `storage` to read `scans/daily_log.json`
 
-2. **Read Today's Opportunities**: Use `storage` to read `opportunities/` directory for today's files
+2. **Read Today's Opportunities**: Use `storage` to read `opportunities/` directory for today's files, including `opportunities/active_scored.json` (scored by opportunity_scorer)
 
-3. **Read Current Memory**: Use `read_file` to read `memory/MEMORY.md`
+3. **Read Post-Mortem Data**: Use `storage` to read:
+   - `postmortem/hit_rates.json` (running accuracy statistics from post_mortem)
+   - `postmortem/recommendations.json` (tuning suggestions)
+   - `postmortem/review_history.json` (past validations)
+
+4. **Read Current Memory**: Use `read_file` to read `memory/MEMORY.md`
+
+5. **Read Analytical Skill History**:
+   - `regime/regime_changes.json` (regime transitions from trend_regime_filter)
+   - `correlation/correlation_history.json` (correlation shifts)
+   - `macro/trigger_history.json` (macro event outcomes)
 
 4. **Analyze What Happened**:
    - Which market movements were predicted correctly?

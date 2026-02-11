@@ -15,14 +15,20 @@ Monitor markets in real-time for sudden price movements and send urgent alerts.
 ## Procedure
 
 1. **Quick Market Check**: Use `market_data` with `multi_ticker` for:
-   `["BTCUSDT", "ETHUSDT", "SOLUSDT", "XAUUSDT", "EURUSDT"]`
+   `["BTCUSDT", "ETHUSDT", "SOLUSDT", "XAUUSD", "EURUSDT"]`
 
 2. **Read Previous Check**: Use `storage` to read `alerts/last_check.json`
 
-3. **Compare**:
-   - If any asset moved >3% since last check (5 min): **ALERT**
-   - If any asset moved >5% in 24h AND wasn't previously alerted: **ALERT**
-   - If BTC moved >2% in 5 minutes: **CRITICAL ALERT**
+3. **Read Noise Profiles**: Use `storage` to read `volatility/current_noise_profile.json` (from volatility_noise_filter)
+
+4. **Compare using dynamic thresholds** (instead of fixed %):
+   - If volatility_noise_filter data available:
+     - ALERT if current move z_score >= 2.0 for that asset (is_signal = true)
+     - CRITICAL ALERT if z_score >= 3.0 (extreme_move)
+   - Fallback (if noise profile unavailable):
+     - If any asset moved >3% since last check (5 min): **ALERT**
+     - If any asset moved >5% in 24h AND wasn't previously alerted: **ALERT**
+     - If BTC moved >2% in 5 minutes: **CRITICAL ALERT**
 
 4. **If Alert Triggered**:
    - Use `message` tool to send to Telegram immediately:

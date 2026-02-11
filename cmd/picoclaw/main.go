@@ -989,10 +989,6 @@ func loadConfig() (*config.Config, error) {
 // Jobs are only added if they don't already exist (idempotent).
 func registerEconCronJobs(cronService *cron.CronService) {
 	existingJobs := cronService.ListJobs(true)
-	existing := make(map[string]bool)
-	for _, job := range existingJobs {
-		existing[job.Name] = true
-	}
 
 	type econJob struct {
 		name    string
@@ -1006,54 +1002,57 @@ func registerEconCronJobs(cronService *cron.CronService) {
 	jobs := []econJob{
 		{
 			name:    "econ:scan_markets",
-			message: "Execute the scan_markets skill. Scan all major markets, gather news, analyze data, and save results to storage.",
+			message: "Execute the scan_markets skill. Scan all major markets, gather news, analyze data, and save results to storage. Do NOT send any message to Telegram — just save data silently.",
 			kind:    "every",
 			everyS:  900, // 15 minutes
-			deliver: true,
+			deliver: false,
 		},
 		{
 			name:    "econ:detect_opportunity",
-			message: "Execute the detect_opportunity skill. Read latest scan data and memory, cross-reference and detect patterns, score opportunities, and save findings.",
+			message: "Execute the detect_opportunity skill. Read latest scan data and memory, cross-reference and detect patterns, score opportunities, and save findings. Only send a Telegram message if you find a HIGH-confidence opportunity (score >= 7). Otherwise stay silent.",
 			kind:    "every",
 			everyS:  1800, // 30 minutes
-			deliver: true,
+			deliver: false,
 		},
 		{
 			name:    "econ:volatility_alert",
-			message: "Execute the volatility_alert skill. Quick market check for sudden price spikes. Compare with last check. Alert on >3% moves. Save state.",
+			message: "Execute the volatility_alert skill. Quick market check for sudden price spikes. Compare with last check using storage. Save state. Only send a Telegram alert if a significant move (>3%) is actually detected. If nothing notable, stay completely silent — do NOT send any message.",
 			kind:    "every",
 			everyS:  300, // 5 minutes
-			deliver: true,
+			deliver: false,
 		},
 		{
 			name:    "econ:daily_outlook",
-			message: "Execute the daily_outlook skill. Generate comprehensive morning briefing with market data, news, yesterday's review, and active opportunities. Send full report to Telegram.",
+			message: "Execute the daily_outlook skill. Generate comprehensive morning briefing with market data, news, yesterday's review, and active opportunities. Send the full report to Telegram using the message tool.",
 			kind:    "cron",
 			expr:    "0 7 * * *", // 7:00 AM daily
-			deliver: true,
+			deliver: false,
 		},
 		{
 			name:    "econ:evening_summary",
-			message: "Execute the learn_from_day skill (full daily review). Review today's predictions vs reality, extract learnings, update memory and patterns, send evening summary to Telegram.",
+			message: "Execute the learn_from_day skill (full daily review). Review today's predictions vs reality, extract learnings, update memory and patterns. Send evening summary to Telegram using the message tool.",
 			kind:    "cron",
 			expr:    "0 22 * * *", // 10:00 PM daily
-			deliver: true,
+			deliver: false,
 		},
 		{
 			name:    "econ:hourly_learn",
-			message: "Execute the learn_from_day skill (hourly light review). Check latest scan for significant changes, update intraday notes if notable patterns forming. No Telegram message needed.",
+			message: "Execute the learn_from_day skill (hourly light review). Check latest scan for significant changes, update intraday notes if notable patterns forming. Do NOT send any Telegram message.",
 			kind:    "cron",
 			expr:    "0 */1 * * *", // Every hour
 			deliver: false,
 		},
 	}
 
-	registered := 0
-	for _, j := range jobs {
-		if existing[j.name] {
-			continue
-		}
+	// Build a map of existing jobs by name -> ID for updates
+	existingByName := make(map[string]string) // name -> jobID
+	for _, job := range existingJobs {
+		existingByName[job.Name] = job.ID
+	}
 
+	registered := 0
+	updated := 0
+	for _, j := range jobs {
 		var schedule cron.CronSchedule
 		if j.kind == "every" {
 			everyMS := j.everyS * 1000
@@ -1068,6 +1067,12 @@ func registerEconCronJobs(cronService *cron.CronService) {
 			}
 		}
 
+		// If job already exists, remove it and re-add with updated config
+		if oldID, exists := existingByName[j.name]; exists {
+			cronService.RemoveJob(oldID)
+			updated++
+		}
+
 		_, err := cronService.AddJob(j.name, schedule, j.message, j.deliver, "telegram", "")
 		if err != nil {
 			fmt.Printf("  Warning: Failed to register %s: %v\n", j.name, err)
@@ -1076,10 +1081,11 @@ func registerEconCronJobs(cronService *cron.CronService) {
 		registered++
 	}
 
+	if updated > 0 {
+		fmt.Printf("  Updated %d existing economic cron jobs\n", updated)
+	}
 	if registered > 0 {
 		fmt.Printf("  Registered %d economic monitoring cron jobs\n", registered)
-	} else {
-		fmt.Println("  Economic cron jobs already registered")
 	}
 }
 
