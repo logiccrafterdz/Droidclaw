@@ -1,5 +1,5 @@
 <div align="center">
-<img src="assets/logo.jpg" alt="DroidClaw" width="512">
+<img src="assets/logo.png" alt="DroidClaw" width="512">
 
 <h1>DroidClaw: Economic Monitor on Android</h1>
 
