@@ -1,13 +1,13 @@
 <div align="center">
-<img src="assets/logo.jpg" alt="PicoClaw" width="512">
+<img src="assets/logo.jpg" alt="Droidclaw" width="512">
 
-<h1>PicoClaw: Ultra-Efficient AI Assistant in Go</h1>
+<h1>Droidclaw: Enhanced Ultra-Efficient AI Assistant</h1>
 
-<h3>$10 Hardware · 10MB RAM · 1s Boot · 皮皮虾，我们走！</h3>
+<h3>Persistent Memory · Contextual Awareness · $10 Hardware · 10MB RAM</h3>
 <h3></h3>
 
 <p>
-<img src="https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go&logoColor=white" alt="Go">
+<img src="https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go&logoColor=white" alt="Go">
 <img src="https://img.shields.io/badge/Arch-x86__64%2C%20ARM64%2C%20RISC--V-blue" alt="Hardware">
 <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
 </p>
@@ -17,9 +17,19 @@
 
 ---
 
-🦐 PicoClaw is an ultra-lightweight personal AI Assistant inspired by [nanobot](https://github.com/HKUDS/nanobot), refactored from the ground up in Go through a self-bootstrapping process, where the AI agent itself drove the entire architectural migration and code optimization.
+🦀 **Droidclaw** is an enhanced, ultra-lightweight personal AI Assistant. It is a specialized fork of [PicoClaw](https://github.com/sipeed/picoclaw), built from the ground up in Go for extreme efficiency and portability.
 
-⚡️ Runs on $10 hardware with <10MB RAM: That's 99% less memory than OpenClaw and 98% cheaper than a Mac mini!
+⚡️ Runs on $10 hardware with <10MB RAM: Delivering powerful AI agency to edge devices without the overhead.
+
+## 🚀 Enhancements (Droidclaw vs Original)
+
+This fork introduces several critical improvements for a more robust and intelligent assistant experience:
+
+- 🧠 **Advanced Memory System**: Implements a persistent memory layer that allows the agent to learn from interactions, store user preferences, and maintain long-term context across sessions.
+- 🎯 **Contextual Tool Awareness**: Tools are now aware of their execution environment (Channel, Chat ID), enabling personalized responses and interaction-specific logic.
+- 🏗️ **Performance & Stability**: Upgraded to **Go 1.24** with refined concurrency models, especially in the background job (Cron) scheduling for better reliability.
+- 🔍 **Observability**: Enhanced logging throughout the agent loop and tool execution for easier debugging and performance monitoring.
+- 🛠️ **Utility Extensions**: Added specialized string handling and Unicode-aware truncation utilities for better UI/UX across different chat platforms.
 
 <table align="center">
   <tr align="center">

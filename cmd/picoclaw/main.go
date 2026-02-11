@@ -78,7 +78,11 @@ func main() {
 
 	switch command {
 	case "onboard":
-		onboard()
+		if len(os.Args) > 2 && os.Args[2] == "econ" {
+			onboardEcon()
+		} else {
+			onboard()
+		}
 	case "agent":
 		agentCmd()
 	case "gateway":
@@ -150,13 +154,14 @@ func printHelp() {
 	fmt.Println("Usage: picoclaw <command>")
 	fmt.Println()
 	fmt.Println("Commands:")
-	fmt.Println("  onboard     Initialize picoclaw configuration and workspace")
-	fmt.Println("  agent       Interact with the agent directly")
-	fmt.Println("  gateway     Start picoclaw gateway")
-	fmt.Println("  status      Show picoclaw status")
-	fmt.Println("  cron        Manage scheduled tasks")
-	fmt.Println("  skills      Manage skills (install, list, remove)")
-	fmt.Println("  version     Show version information")
+	fmt.Println("  onboard        Initialize picoclaw configuration and workspace")
+	fmt.Println("  onboard econ   Initialize DroidClaw economic watcher workspace")
+	fmt.Println("  agent          Interact with the agent directly")
+	fmt.Println("  gateway        Start picoclaw gateway (includes econ watcher)")
+	fmt.Println("  status         Show picoclaw status")
+	fmt.Println("  cron           Manage scheduled tasks")
+	fmt.Println("  skills         Manage skills (install, list, remove)")
+	fmt.Println("  version        Show version information")
 }
 
 func onboard() {
@@ -191,6 +196,268 @@ func onboard() {
 	fmt.Println("  1. Add your API key to", configPath)
 	fmt.Println("     Get one at: https://openrouter.ai/keys")
 	fmt.Println("  2. Chat: picoclaw agent -m \"Hello!\"")
+}
+
+func onboardEcon() {
+	cfg, err := loadConfig()
+	if err != nil {
+		fmt.Println("Run 'picoclaw onboard' first to create base configuration.")
+		os.Exit(1)
+	}
+
+	// Set up econ workspace path
+	home, _ := os.UserHomeDir()
+	econWorkspace := filepath.Join(home, ".picoclaw", "workspace_econ")
+
+	// Create directory structure
+	dirs := []string{
+		econWorkspace,
+		filepath.Join(econWorkspace, "memory"),
+		filepath.Join(econWorkspace, "memory", "patterns"),
+		filepath.Join(econWorkspace, "data"),
+		filepath.Join(econWorkspace, "data", "scans"),
+		filepath.Join(econWorkspace, "data", "candles"),
+		filepath.Join(econWorkspace, "data", "news"),
+		filepath.Join(econWorkspace, "data", "reports"),
+		filepath.Join(econWorkspace, "data", "opportunities"),
+		filepath.Join(econWorkspace, "data", "alerts"),
+		filepath.Join(econWorkspace, "data", "learning"),
+		filepath.Join(econWorkspace, "data", "patterns"),
+		filepath.Join(econWorkspace, "skills"),
+		filepath.Join(econWorkspace, "sessions"),
+		filepath.Join(econWorkspace, "cron"),
+	}
+
+	for _, dir := range dirs {
+		os.MkdirAll(dir, 0755)
+	}
+
+	// Create econ-specific workspace templates
+	createEconWorkspaceTemplates(econWorkspace)
+
+	// Update config with named agent
+	if cfg.Agents.Named == nil {
+		cfg.Agents.Named = make(map[string]config.AgentDefaults)
+	}
+	cfg.Agents.Named["econ_watcher"] = config.AgentDefaults{
+		Workspace:         econWorkspace,
+		MaxToolIterations: 30,
+	}
+
+	configPath := getConfigPath()
+	if err := config.SaveConfig(configPath, cfg); err != nil {
+		fmt.Printf("Error saving config: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("%s DroidClaw Economic Watcher initialized!\n", logo)
+	fmt.Println("\nWorkspace:", econWorkspace)
+	fmt.Println("\nDirectory structure created:")
+	fmt.Println("  data/scans/           - Market scan results")
+	fmt.Println("  data/opportunities/   - Detected opportunities")
+	fmt.Println("  data/alerts/          - Volatility alerts")
+	fmt.Println("  data/reports/         - Generated reports")
+	fmt.Println("  data/learning/        - Learning logs")
+	fmt.Println("  data/patterns/        - Known market patterns")
+	fmt.Println("  memory/               - Long-term memory")
+	fmt.Println()
+	fmt.Println("Next steps:")
+	fmt.Println("  1. Configure Telegram in", configPath)
+	fmt.Println("  2. Start the gateway: picoclaw gateway")
+	fmt.Println("  3. Cron jobs will auto-register on first start")
+}
+
+func createEconWorkspaceTemplates(workspace string) {
+	templates := map[string]string{
+		"AGENTS.md": `# DroidClaw Economic Watcher - Agent Instructions
+
+You are DroidClaw, an autonomous economic monitoring agent running 24/7 on an Android device.
+
+## Primary Mission
+Monitor global financial markets, detect patterns and opportunities, and deliver actionable intelligence reports.
+
+## Core Responsibilities
+
+1. **Market Scanning**: Continuously monitor crypto, forex, and commodities markets
+2. **Pattern Detection**: Identify recurring patterns, breakouts, divergences, and anomalies
+3. **News Analysis**: Track economic news and correlate with market movements
+4. **Report Generation**: Produce daily outlook reports and real-time alerts
+5. **Learning**: Build and refine a knowledge base of market patterns over time
+
+## Operating Rules
+
+### CRITICAL SAFETY RULES
+- **NEVER** suggest executing trades or placing orders
+- **NEVER** provide specific financial advice (buy/sell/hold)
+- **ALWAYS** present analysis as observations for informational purposes only
+- **ALWAYS** include confidence levels with any prediction
+- **ALWAYS** include "Not financial advice" disclaimer in reports
+
+### Behavioral Rules
+- Be analytical, objective, and data-driven
+- When confidence is below 5/10, explicitly state "low confidence - monitor only"
+- Prioritize accuracy over speed
+- When in doubt, observe and report rather than speculate
+- Keep reports concise and scannable (use emojis for visual parsing)
+- Store all data systematically for future pattern matching
+
+## Tools Available
+- ` + "`market_data`" + ` - Real-time market prices, candles, orderbook
+- ` + "`news_feed`" + ` - Economic news from RSS feeds
+- ` + "`storage`" + ` - Read/write structured data in workspace
+- ` + "`message`" + ` - Send reports to Telegram
+- ` + "`read_file`" + ` / ` + "`write_file`" + ` - Read/write workspace files
+- ` + "`web_fetch`" + ` - Fetch web content for additional data
+
+## Workflow
+When triggered by cron:
+1. Check which skill/task was triggered
+2. Execute the skill procedure step by step
+3. Use tools to gather data, analyze, and store results
+4. Send alerts/reports to Telegram when required
+5. Update memory with new learnings
+`,
+		"SOUL.md": `# DroidClaw - Soul
+
+## Personality
+I am DroidClaw, an analytical economic observer. I am:
+- **Precise**: I deal in data, not speculation
+- **Cautious**: I highlight risks alongside opportunities
+- **Persistent**: I monitor markets 24/7 without fatigue
+- **Objective**: I present facts, not opinions
+- **Curious**: I seek patterns others might miss
+
+## Voice
+- Concise and structured in reports
+- Use data to support every observation
+- Professional but accessible
+- Arabic-friendly (can report in Arabic when configured)
+
+## Philosophy
+"Observe. Analyze. Report. Never act."
+
+I am a watchtower, not a trader. My value is in providing clear, timely information
+so that humans can make informed decisions.
+`,
+		"USER.md": `# User Profile
+
+## Preferences
+- Language: Arabic (primary), English (reports)
+- Timezone: (configure your timezone)
+- Report schedule: Morning (7:00 AM), Evening (10:00 PM)
+- Alert threshold: 3% price change
+
+## Markets of Interest
+- Crypto: BTC, ETH, SOL, BNB, XRP
+- Forex: EUR/USD, GBP/USD, USD/SAR, USD/AED
+- Commodities: Gold (XAU), Silver (XAG)
+- Indices: DXY (Dollar Index)
+
+## Risk Tolerance
+- Conservative: Focus on high-confidence patterns only
+- Minimum confidence for alerts: 6/10
+
+## Notification Preferences
+- Critical alerts (>5% move): Immediate
+- Opportunity detection: Every 30 minutes (if found)
+- Daily reports: 7:00 AM and 10:00 PM
+- Quiet hours: None (24/7 monitoring)
+`,
+		"IDENTITY.md": `# DroidClaw - Identity
+
+## Name
+DroidClaw - Economic Watcher
+
+## Version
+1.0.0
+
+## Description
+Autonomous economic monitoring agent running on Android via Termux.
+Built on PicoClaw framework, specialized for 24/7 market surveillance.
+
+## Purpose
+- Monitor global financial markets continuously
+- Detect patterns and potential opportunities
+- Generate actionable intelligence reports
+- Learn from market behavior over time
+- Deliver real-time alerts for significant events
+
+## Capabilities
+- Real-time crypto/forex/commodity market data
+- Multi-source news aggregation and analysis
+- Pattern detection and machine learning
+- Automated scheduled monitoring (cron-based)
+- Telegram integration for reports and alerts
+- Persistent memory for pattern recognition
+
+## Architecture
+- Runtime: Go binary on Termux (Android)
+- LLM: OpenRouter / OpenAI API for analysis
+- Data: Binance API (crypto), Open Exchange Rates (forex)
+- News: RSS feeds (CoinDesk, Reuters, DailyFX, etc.)
+- Storage: Local JSON files in workspace
+- Communication: Telegram Bot API
+`,
+	}
+
+	for filename, content := range templates {
+		filePath := filepath.Join(workspace, filename)
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			os.WriteFile(filePath, []byte(content), 0644)
+			fmt.Printf("  Created %s\n", filename)
+		}
+	}
+
+	// Create memory file
+	memoryFile := filepath.Join(workspace, "memory", "MEMORY.md")
+	if _, err := os.Stat(memoryFile); os.IsNotExist(err) {
+		memoryContent := `# DroidClaw Economic Memory
+
+## Market Observations
+(Patterns and observations learned over time)
+
+## Correlations
+(Known correlations between assets)
+
+## Reliable Patterns
+(Patterns with high confidence scores)
+
+## News Source Reliability
+(Which news sources correlate best with actual market moves)
+
+## Configuration Notes
+- Monitoring started: ` + time.Now().Format("2006-01-02") + `
+- Markets: BTC, ETH, SOL, Gold, EUR/USD, GBP/USD
+- Alert threshold: 3%
+`
+		os.WriteFile(memoryFile, []byte(memoryContent), 0644)
+		fmt.Println("  Created memory/MEMORY.md")
+	}
+
+	// Create initial patterns file
+	patternsFile := filepath.Join(workspace, "data", "patterns", "known_patterns.json")
+	if _, err := os.Stat(patternsFile); os.IsNotExist(err) {
+		initialPatterns := `{
+  "patterns": [],
+  "correlations": [
+    {
+      "pair": ["BTCUSDT", "ETHUSDT"],
+      "type": "positive",
+      "strength": 0.85,
+      "note": "ETH generally follows BTC with slight delay"
+    },
+    {
+      "pair": ["XAUUSDT", "EURUSDT"],
+      "type": "positive",
+      "strength": 0.60,
+      "note": "Gold and EUR often move together vs USD"
+    }
+  ],
+  "last_updated": "` + time.Now().UTC().Format(time.RFC3339) + `"
+}`
+		os.WriteFile(patternsFile, []byte(initialPatterns), 0644)
+		fmt.Println("  Created data/patterns/known_patterns.json")
+	}
 }
 
 func createWorkspaceTemplates(workspace string) {
@@ -554,6 +821,11 @@ func gatewayCmd() {
 	// Setup cron tool and service
 	cronService := setupCronTool(agentLoop, msgBus, cfg.WorkspacePath())
 
+	// Auto-register economic cron jobs if econ_watcher agent is configured
+	if _, hasEcon := cfg.Agents.Named["econ_watcher"]; hasEcon {
+		registerEconCronJobs(cronService)
+	}
+
 	heartbeatService := heartbeat.NewHeartbeatService(
 		cfg.WorkspacePath(),
 		nil,
@@ -711,6 +983,104 @@ func setupCronTool(agentLoop *agent.AgentLoop, msgBus *bus.MessageBus, workspace
 
 func loadConfig() (*config.Config, error) {
 	return config.LoadConfig(getConfigPath())
+}
+
+// registerEconCronJobs sets up the autonomous economic monitoring cron jobs.
+// Jobs are only added if they don't already exist (idempotent).
+func registerEconCronJobs(cronService *cron.CronService) {
+	existingJobs := cronService.ListJobs(true)
+	existing := make(map[string]bool)
+	for _, job := range existingJobs {
+		existing[job.Name] = true
+	}
+
+	type econJob struct {
+		name    string
+		message string
+		kind    string // "every" or "cron"
+		everyS  int64  // seconds for "every" kind
+		expr    string // cron expression for "cron" kind
+		deliver bool
+	}
+
+	jobs := []econJob{
+		{
+			name:    "econ:scan_markets",
+			message: "Execute the scan_markets skill. Scan all major markets, gather news, analyze data, and save results to storage.",
+			kind:    "every",
+			everyS:  900, // 15 minutes
+			deliver: true,
+		},
+		{
+			name:    "econ:detect_opportunity",
+			message: "Execute the detect_opportunity skill. Read latest scan data and memory, cross-reference and detect patterns, score opportunities, and save findings.",
+			kind:    "every",
+			everyS:  1800, // 30 minutes
+			deliver: true,
+		},
+		{
+			name:    "econ:volatility_alert",
+			message: "Execute the volatility_alert skill. Quick market check for sudden price spikes. Compare with last check. Alert on >3% moves. Save state.",
+			kind:    "every",
+			everyS:  300, // 5 minutes
+			deliver: true,
+		},
+		{
+			name:    "econ:daily_outlook",
+			message: "Execute the daily_outlook skill. Generate comprehensive morning briefing with market data, news, yesterday's review, and active opportunities. Send full report to Telegram.",
+			kind:    "cron",
+			expr:    "0 7 * * *", // 7:00 AM daily
+			deliver: true,
+		},
+		{
+			name:    "econ:evening_summary",
+			message: "Execute the learn_from_day skill (full daily review). Review today's predictions vs reality, extract learnings, update memory and patterns, send evening summary to Telegram.",
+			kind:    "cron",
+			expr:    "0 22 * * *", // 10:00 PM daily
+			deliver: true,
+		},
+		{
+			name:    "econ:hourly_learn",
+			message: "Execute the learn_from_day skill (hourly light review). Check latest scan for significant changes, update intraday notes if notable patterns forming. No Telegram message needed.",
+			kind:    "cron",
+			expr:    "0 */1 * * *", // Every hour
+			deliver: false,
+		},
+	}
+
+	registered := 0
+	for _, j := range jobs {
+		if existing[j.name] {
+			continue
+		}
+
+		var schedule cron.CronSchedule
+		if j.kind == "every" {
+			everyMS := j.everyS * 1000
+			schedule = cron.CronSchedule{
+				Kind:    "every",
+				EveryMS: &everyMS,
+			}
+		} else {
+			schedule = cron.CronSchedule{
+				Kind: "cron",
+				Expr: j.expr,
+			}
+		}
+
+		_, err := cronService.AddJob(j.name, schedule, j.message, j.deliver, "telegram", "")
+		if err != nil {
+			fmt.Printf("  Warning: Failed to register %s: %v\n", j.name, err)
+			continue
+		}
+		registered++
+	}
+
+	if registered > 0 {
+		fmt.Printf("  Registered %d economic monitoring cron jobs\n", registered)
+	} else {
+		fmt.Println("  Economic cron jobs already registered")
+	}
 }
 
 func cronCmd() {

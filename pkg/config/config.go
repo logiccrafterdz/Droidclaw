@@ -19,7 +19,8 @@ type Config struct {
 }
 
 type AgentsConfig struct {
-	Defaults AgentDefaults `json:"defaults"`
+	Defaults AgentDefaults            `json:"defaults"`
+	Named    map[string]AgentDefaults `json:"named,omitempty"`
 }
 
 type AgentDefaults struct {
@@ -242,6 +243,47 @@ func (c *Config) WorkspacePath() string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return expandHome(c.Agents.Defaults.Workspace)
+}
+
+// GetAgent returns agent config by name, falling back to defaults for missing fields.
+func (c *Config) GetAgent(name string) AgentDefaults {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if name == "" || name == "defaults" {
+		return c.Agents.Defaults
+	}
+
+	if c.Agents.Named != nil {
+		if agent, ok := c.Agents.Named[name]; ok {
+			// Merge with defaults: use named value if set, otherwise default
+			merged := c.Agents.Defaults
+			if agent.Workspace != "" {
+				merged.Workspace = agent.Workspace
+			}
+			if agent.Model != "" {
+				merged.Model = agent.Model
+			}
+			if agent.MaxTokens > 0 {
+				merged.MaxTokens = agent.MaxTokens
+			}
+			if agent.Temperature > 0 {
+				merged.Temperature = agent.Temperature
+			}
+			if agent.MaxToolIterations > 0 {
+				merged.MaxToolIterations = agent.MaxToolIterations
+			}
+			return merged
+		}
+	}
+
+	return c.Agents.Defaults
+}
+
+// WorkspacePathForAgent returns the resolved workspace path for a named agent.
+func (c *Config) WorkspacePathForAgent(name string) string {
+	agent := c.GetAgent(name)
+	return expandHome(agent.Workspace)
 }
 
 func (c *Config) GetAPIKey() string {

@@ -76,6 +76,11 @@ func NewAgentLoop(cfg *config.Config, msgBus *bus.MessageBus, provider providers
 	})
 	toolsRegistry.Register(messageTool)
 
+	// Register economic monitoring tools
+	toolsRegistry.Register(tools.NewMarketDataTool())
+	toolsRegistry.Register(tools.NewNewsFeedTool())
+	toolsRegistry.Register(tools.NewStorageTool(workspace))
+
 	// Register spawn tool
 	subagentManager := tools.NewSubagentManager(provider, workspace, msgBus)
 	spawnTool := tools.NewSpawnTool(subagentManager)
