@@ -178,6 +178,13 @@ func CreateProvider(cfg *config.Config) (LLMProvider, error) {
 	lowerModel := strings.ToLower(model)
 
 	switch {
+	case (strings.Contains(lowerModel, "deepseek")) && cfg.Providers.DeepSeek.APIKey != "":
+		apiKey = cfg.Providers.DeepSeek.APIKey
+		apiBase = cfg.Providers.DeepSeek.APIBase
+		if apiBase == "" {
+			apiBase = "https://api.deepseek.com"
+		}
+
 	case strings.HasPrefix(model, "openrouter/") || strings.HasPrefix(model, "anthropic/") || strings.HasPrefix(model, "openai/") || strings.HasPrefix(model, "meta-llama/") || strings.HasPrefix(model, "deepseek/") || strings.HasPrefix(model, "google/"):
 		apiKey = cfg.Providers.OpenRouter.APIKey
 		if cfg.Providers.OpenRouter.APIBase != "" {

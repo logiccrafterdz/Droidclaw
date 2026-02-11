@@ -97,9 +97,17 @@ func (t *MarketDataTool) getTicker(ctx context.Context, args map[string]interfac
 	}
 	symbol = strings.ToUpper(symbol)
 
+	// Special handling for Spot Gold (XAUUSD)
+	if symbol == "XAUUSD" || symbol == "XAU" {
+		return t.getForexRateAsTicker(ctx, "XAU")
+	}
+
 	url := fmt.Sprintf("https://api.binance.com/api/v3/ticker/24hr?symbol=%s", symbol)
 	body, err := t.httpGet(ctx, url)
 	if err != nil {
+		if strings.Contains(err.Error(), "400") {
+			return fmt.Sprintf("Error: Invalid symbol '%s'. Note: For Spot Gold use 'XAUUSD'.", symbol), nil
+		}
 		return fmt.Sprintf("Error fetching ticker: %v", err), nil
 	}
 
@@ -325,7 +333,7 @@ func (t *MarketDataTool) getForex(ctx context.Context, args map[string]interface
 		return "Error: unexpected forex API response format", nil
 	}
 
-	keyCurrencies := []string{"EUR", "GBP", "JPY", "CHF", "AUD", "CAD", "CNY", "SAR", "AED", "TRY", "RUB", "INR", "BRL"}
+	keyCurrencies := []string{"EUR", "GBP", "JPY", "CHF", "AUD", "CAD", "CNY", "SAR", "AED", "TRY", "RUB", "INR", "BRL", "XAU"}
 	filtered := make(map[string]interface{})
 	for _, cur := range keyCurrencies {
 		if rate, exists := rates[cur]; exists {
@@ -339,6 +347,38 @@ func (t *MarketDataTool) getForex(ctx context.Context, args map[string]interface
 		"all_rates":    len(rates),
 		"last_updated": data["time_last_update_utc"],
 		"timestamp":    time.Now().UTC().Format(time.RFC3339),
+	}
+
+	out, _ := json.MarshalIndent(result, "", "  ")
+	return string(out), nil
+}
+
+func (t *MarketDataTool) getForexRateAsTicker(ctx context.Context, symbol string) (string, error) {
+	// Use EUR as base to get XAU price in EUR, then convert or just get USD base
+	// Actually ER-API with USD base gives XAU rate (1/price)
+	body, err := t.httpGet(ctx, "https://open.er-api.com/v6/latest/USD")
+	if err != nil {
+		return fmt.Sprintf("Error fetching gold price: %v", err), nil
+	}
+
+	var data map[string]interface{}
+	json.Unmarshal(body, &data)
+	rates := data["rates"].(map[string]interface{})
+
+	rate, ok := rates[symbol].(float64)
+	if !ok || rate == 0 {
+		return fmt.Sprintf("Error: Price data for %s currently unavailable via Forex API", symbol), nil
+	}
+
+	price := 1.0 / rate // XAU rate is 1 oz per USD, so price is 1/rate
+
+	result := map[string]interface{}{
+		"symbol":           symbol + "USD",
+		"price":            fmt.Sprintf("%.2f", price),
+		"price_change":     "0.00",
+		"price_change_pct": "0.00",
+		"source":           "Forex API (Spot)",
+		"timestamp":        time.Now().UTC().Format(time.RFC3339),
 	}
 
 	out, _ := json.MarshalIndent(result, "", "  ")

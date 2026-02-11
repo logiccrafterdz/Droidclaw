@@ -13,6 +13,7 @@ bin/
 .picoclaw/
 config.json
 sessions/
+memory/
 build/
 
 # Coverage

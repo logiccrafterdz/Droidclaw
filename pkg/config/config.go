@@ -97,6 +97,7 @@ type ProvidersConfig struct {
 	Zhipu      ProviderConfig `json:"zhipu"`
 	VLLM       ProviderConfig `json:"vllm"`
 	Gemini     ProviderConfig `json:"gemini"`
+	DeepSeek   ProviderConfig `json:"deepseek"`
 }
 
 type ProviderConfig struct {
@@ -184,6 +185,7 @@ func DefaultConfig() *Config {
 			Zhipu:      ProviderConfig{},
 			VLLM:       ProviderConfig{},
 			Gemini:     ProviderConfig{},
+			DeepSeek:   ProviderConfig{},
 		},
 		Gateway: GatewayConfig{
 			Host: "0.0.0.0",

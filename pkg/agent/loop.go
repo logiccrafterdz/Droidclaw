@@ -35,6 +35,8 @@ type AgentLoop struct {
 	sessions       *session.SessionManager
 	contextBuilder *ContextBuilder
 	tools          *tools.ToolRegistry
+	maxTokens      int
+	temperature    float64
 	running        bool
 	summarizing    sync.Map      // Tracks which sessions are currently being summarized
 }
@@ -101,8 +103,10 @@ func NewAgentLoop(cfg *config.Config, msgBus *bus.MessageBus, provider providers
 		provider:       provider,
 		workspace:      workspace,
 		model:          cfg.Agents.Defaults.Model,
-		contextWindow:  cfg.Agents.Defaults.MaxTokens, // Restore context window for summarization
+		contextWindow:  cfg.Agents.Defaults.MaxTokens,
 		maxIterations:  cfg.Agents.Defaults.MaxToolIterations,
+		maxTokens:      cfg.Agents.Defaults.MaxTokens,
+		temperature:    cfg.Agents.Defaults.Temperature,
 		sessions:       sessionsManager,
 		contextBuilder: contextBuilder,
 		tools:          toolsRegistry,
@@ -330,8 +334,8 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 				"model":             al.model,
 				"messages_count":    len(messages),
 				"tools_count":       len(providerToolDefs),
-				"max_tokens":        8192,
-				"temperature":       0.7,
+				"max_tokens":        al.maxTokens,
+				"temperature":       al.temperature,
 				"system_prompt_len": len(messages[0].Content),
 			})
 
@@ -345,8 +349,8 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 
 		// Call LLM
 		response, err := al.provider.Chat(ctx, messages, providerToolDefs, al.model, map[string]interface{}{
-			"max_tokens":  8192,
-			"temperature": 0.7,
+			"max_tokens":  al.maxTokens,
+			"temperature": al.temperature,
 		})
 
 		if err != nil {
