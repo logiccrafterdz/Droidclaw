@@ -134,7 +134,15 @@ func (sm *SessionManager) TruncateHistory(key string, keepLast int) {
 		return
 	}
 
-	session.Messages = session.Messages[len(session.Messages)-keepLast:]
+	startIdx := len(session.Messages) - keepLast
+
+	// Smart Truncate: Ensure we don't start with an orphaned "tool" message.
+	// If the current start is a "tool" role, move back until we find its owner "assistant" message.
+	for startIdx > 0 && session.Messages[startIdx].Role == "tool" {
+		startIdx--
+	}
+
+	session.Messages = session.Messages[startIdx:]
 	session.Updated = time.Now()
 }
 

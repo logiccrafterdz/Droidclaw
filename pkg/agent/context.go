@@ -194,7 +194,16 @@ func (cb *ContextBuilder) BuildMessages(history []providers.Message, summary str
 		Content: systemPrompt,
 	})
 
-	messages = append(messages, history...)
+	// Protocol Guard: Ensure history doesn't start with an orphaned "tool" message.
+	// This can happen if summarization or truncation occurs at an unlucky point.
+	firstValid := 0
+	for firstValid < len(history) && history[firstValid].Role == "tool" {
+		firstValid++
+	}
+
+	if firstValid < len(history) {
+		messages = append(messages, history[firstValid:]...)
+	}
 
 	messages = append(messages, providers.Message{
 		Role:    "user",
