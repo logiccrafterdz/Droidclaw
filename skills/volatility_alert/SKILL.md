@@ -30,7 +30,14 @@ Monitor markets in real-time for sudden price movements and send urgent alerts.
      - If any asset moved >5% in 24h AND wasn't previously alerted: **ALERT**
      - If BTC moved >2% in 5 minutes: **CRITICAL ALERT**
 
-4. **If Alert Triggered**:
+5. **Issue Alerts**:
+   - If `is_signal = true` AND z_score >= 3.0 (extreme_move):
+     - Send high-priority Telegram alert.
+     - **Trigger `macro_explain_move`** skill for the asset to diagnose the "Why".
+   - If `is_signal = true` AND z_score < 3.0:
+     - Send normal volatility alert.
+
+6. **If Alert Triggered**:
    - Use `message` tool to send to Telegram immediately:
    ```
    🚨 VOLATILITY ALERT

@@ -26,49 +26,43 @@ Systematic scoring of raw opportunity signals using quantitative inputs from all
 
 3. **Score Each Opportunity**:
 
-   Start with base_score = 0, then apply rules:
+   Read current weights from `scoring/weights.json`. Let weights be `w_trend`, `w_vol`, `w_corr`, `w_macro`, `w_carry`.
 
-   **a) Trend & Regime Score** (from trend_regime_filter):
-   - Opportunity direction aligns with strong regime trend → +2
-   - Opportunity direction aligns with medium regime trend → +1
-   - Opportunity is "trend continuation" but regime = "Range-bound" → -2
-   - Opportunity is "reversal" with strong trend still active → -1
-   - Regime data unavailable → 0
+   Base score = 0.
 
-   **b) Volatility & Signal Quality** (from volatility_noise_filter):
-   - Current move z_score >= 2.0 (is_signal = true) → +2
-   - Current move z_score 1.0–2.0 (notable_move) → +1
-   - Current move z_score < 1.0 (normal_move / noise) → -1
-   - Volatility regime = "low" AND breakout signal → +1 (low-vol breakouts are significant)
-   - Noise profile unavailable → 0
+   **a) Trend & Regime Score** (Component Score `s_trend`):
+   - Align with strong trend → 2
+   - Align with medium trend → 1
+   - Conflict with regime → -2
+   - Weighted Contribution = `s_trend * w_trend`
 
-   **c) Correlation Risk** (from cross_asset_correlation):
-   - Opportunity asset is uncorrelated to other active opportunities → +1
-   - Opportunity asset is in same high-correlation cluster as existing active opps → -1
-   - Correlation breakdown detected on this asset → +1 (divergence = potential opportunity)
-   - Concentration risk "high" for portfolio → -1
-   - Correlation data unavailable → 0
+   **b) Volatility & Signal Quality** (Component Score `s_vol`):
+   - z_score >= 2.0 → 2
+   - z_score 1.0–2.0 → 1
+   - Noise → -1
+   - Weighted Contribution = `s_vol * w_vol`
 
-   **d) Macro Trigger Alignment** (from event_macro_trigger):
-   - Active high-importance trigger supports opportunity direction → +2
-   - Active medium-importance trigger supports direction → +1
-   - Active trigger contradicts opportunity direction → -2
-   - No active macro trigger (neutral) → 0
-   - Upcoming high-impact event within 24h → -1 (uncertainty discount)
+   **c) Correlation Risk** (Component Score `s_corr`):
+   - Low correlation/Divergence → 1
+   - High concentration/Cluster → -1
+   - Weighted Contribution = `s_corr * w_corr`
 
-   **e) Trend-Carry Alignment** (from trend_carry_regime):
-   - regime_label = "carry_supported_trend" aligned with opp → +1
-   - regime_label = "carry_opposed_trend" → -1
-   - regime_label = "pure_momentum" or "mean_reversion_regime" → 0
-   - Carry data unavailable → 0
+   **d) Macro Trigger Alignment** (Component Score `s_macro`):
+   - Support from high-importance trigger → 2
+   - Support from medium-importance trigger → 1
+   - Contradiction → -2
+   - Weighted Contribution = `s_macro * w_macro`
+
+   **e) Trend-Carry Alignment** (Component Score `s_carry`):
+   - Carry supported → 1
+   - Carry opposed → -1
+   - Weighted Contribution = `s_carry * w_carry`
 
 4. **Compute Final Score**:
    ```
-   raw_score = sum of all component scores (range: roughly -7 to +9)
-   
-   # Normalize to 1-10 scale
-   normalized = round((raw_score + 7) / 16 * 9 + 1)
-   confidence = clamp(normalized, 1, 10)
+   raw_score = (s_trend * w_trend) + (s_vol * w_vol) + (s_corr * w_corr) + (s_macro * w_macro) + (s_carry * w_carry)
+   # Normalize raw_score (which is roughly -2 to +2 weighted sum) to 1-10
+   confidence = clamp(round((raw_score + 2) / 4 * 9 + 1), 1, 10)
    ```
 
 5. **Apply Filters** (reject opportunities that don't pass):

@@ -1042,6 +1042,13 @@ func registerEconCronJobs(cronService *cron.CronService) {
 			expr:    "0 */1 * * *", // Every hour
 			deliver: false,
 		},
+		{
+			name:    "econ:update_weights",
+			message: "Execute the update_scorer_weights skill. Review past performance and adjust opportunity scoring weights for the coming week. Send a brief summary to Telegram.",
+			kind:    "cron",
+			expr:    "30 23 * * 0", // 11:30 PM every Sunday
+			deliver: false,
+		},
 	}
 
 	// Build a map of existing jobs by name -> ID for updates
