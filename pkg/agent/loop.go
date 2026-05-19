@@ -571,21 +571,16 @@ func (al *AgentLoop) summarizeSession(sessionKey string) {
 
 	toSummarize := history[:len(history)-4]
 
-	// Oversized Message Guard
-	// Skip messages larger than 50% of context window to prevent summarizer overflow
+	// Trajectory Compression: Include all roles but truncate oversized messages
 	maxMessageTokens := al.contextWindow / 2
-	validMessages := make([]providers.Message, 0)
-	omitted := false
+	validMessages := make([]providers.Message, 0, len(toSummarize))
+	truncated := false
 
 	for _, m := range toSummarize {
-		if m.Role != "user" && m.Role != "assistant" {
-			continue
-		}
-		// Estimate tokens for this message
-		msgTokens := len(m.Content) / 4
-		if msgTokens > maxMessageTokens {
-			omitted = true
-			continue
+		contentTokens := len(m.Content) / 4
+		if contentTokens > maxMessageTokens {
+			m.Content = utils.Truncate(m.Content, maxMessageTokens*4) + "\n...[Truncated for summary]"
+			truncated = true
 		}
 		validMessages = append(validMessages, m)
 	}
@@ -620,8 +615,8 @@ func (al *AgentLoop) summarizeSession(sessionKey string) {
 		finalSummary, _ = al.summarizeBatch(ctx, validMessages, summary)
 	}
 
-	if omitted && finalSummary != "" {
-		finalSummary += "\n[Note: Some oversized messages were omitted from this summary for efficiency.]"
+	if truncated && finalSummary != "" {
+		finalSummary += "\n[Note: Some long tool outputs or messages were truncated during this summary.]"
 	}
 
 	if finalSummary != "" {
@@ -639,7 +634,20 @@ func (al *AgentLoop) summarizeBatch(ctx context.Context, batch []providers.Messa
 	}
 	prompt += "\nCONVERSATION:\n"
 	for _, m := range batch {
-		prompt += fmt.Sprintf("%s: %s\n", m.Role, m.Content)
+		if len(m.ToolCalls) > 0 {
+			for _, tc := range m.ToolCalls {
+				if tc.Function != nil {
+					prompt += fmt.Sprintf("assistant (Action): Called tool %s with args: %s\n", tc.Function.Name, utils.Truncate(tc.Function.Arguments, 200))
+				}
+			}
+		}
+		if m.Content != "" {
+			role := m.Role
+			if role == "tool" {
+				role = "tool (Result)"
+			}
+			prompt += fmt.Sprintf("%s: %s\n", role, utils.Truncate(m.Content, 1000))
+		}
 	}
 
 	response, err := al.provider.Chat(ctx, []providers.Message{{Role: "user", Content: prompt}}, nil, al.model, map[string]interface{}{
