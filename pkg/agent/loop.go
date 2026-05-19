@@ -347,19 +347,40 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 				"tools_json":    formatToolsForLog(providerToolDefs),
 			})
 
-		// Call LLM
-		response, err := al.provider.Chat(ctx, messages, providerToolDefs, al.model, map[string]interface{}{
-			"max_tokens":  al.maxTokens,
-			"temperature": al.temperature,
-		})
+		// Call LLM with retry and exponential backoff
+		var response *providers.LLMResponse
+		var err error
+		maxRetries := 3
+		backoff := 2 * time.Second
 
-		if err != nil {
-			logger.ErrorCF("agent", "LLM call failed",
+		for attempt := 1; attempt <= maxRetries; attempt++ {
+			response, err = al.provider.Chat(ctx, messages, providerToolDefs, al.model, map[string]interface{}{
+				"max_tokens":  al.maxTokens,
+				"temperature": al.temperature,
+			})
+			if err == nil {
+				break
+			}
+
+			logger.ErrorCF("agent", fmt.Sprintf("LLM call failed (attempt %d/%d)", attempt, maxRetries),
 				map[string]interface{}{
 					"iteration": iteration,
 					"error":     err.Error(),
+					"backoff":   backoff.String(),
 				})
-			return "", iteration, fmt.Errorf("LLM call failed: %w", err)
+
+			if attempt < maxRetries {
+				select {
+				case <-ctx.Done():
+					return "", iteration, ctx.Err()
+				case <-time.After(backoff):
+					backoff *= 2
+				}
+			}
+		}
+
+		if err != nil {
+			return "", iteration, fmt.Errorf("LLM call failed after %d attempts: %w", maxRetries, err)
 		}
 
 		// Check if no tool calls - we're done

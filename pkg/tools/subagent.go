@@ -108,12 +108,31 @@ func (sm *SubagentManager) runTask(ctx context.Context, task *SubagentTask) {
 			}
 		}
 
-		response, err := sm.provider.Chat(ctx, messages, providerToolDefs, sm.provider.GetDefaultModel(), map[string]interface{}{
-			"max_tokens": 4096,
-		})
+		var response *providers.LLMResponse
+		var err error
+		maxRetries := 3
+		backoff := 2 * time.Second
+
+		for attempt := 1; attempt <= maxRetries; attempt++ {
+			response, err = sm.provider.Chat(ctx, messages, providerToolDefs, sm.provider.GetDefaultModel(), map[string]interface{}{
+				"max_tokens": 4096,
+			})
+			if err == nil {
+				break
+			}
+			if attempt < maxRetries {
+				select {
+				case <-ctx.Done():
+					finalResult = fmt.Sprintf("Error: %v", ctx.Err())
+					break
+				case <-time.After(backoff):
+					backoff *= 2
+				}
+			}
+		}
 
 		if err != nil {
-			finalResult = fmt.Sprintf("Error: %v", err)
+			finalResult = fmt.Sprintf("Error after %d attempts: %v", maxRetries, err)
 			break
 		}
 
