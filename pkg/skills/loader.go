@@ -26,14 +26,16 @@ type SkillsLoader struct {
 	workspaceSkills string // workspace skills (项目级别)
 	globalSkills    string // 全局 skills (~/.picoclaw/skills)
 	builtinSkills   string // 内置 skills
+	router          *SkillRouter
 }
 
 func NewSkillsLoader(workspace string, globalSkills string, builtinSkills string) *SkillsLoader {
 	return &SkillsLoader{
 		workspace:       workspace,
 		workspaceSkills: filepath.Join(workspace, "skills"),
-		globalSkills:    globalSkills, // ~/.picoclaw/skills
+		globalSkills:    globalSkills,
 		builtinSkills:   builtinSkills,
+		router:          NewSkillRouter(),
 	}
 }
 
@@ -178,15 +180,17 @@ func (sl *SkillsLoader) LoadSkillsForContext(skillNames []string) string {
 	return strings.Join(parts, "\n\n---\n\n")
 }
 
-func (sl *SkillsLoader) BuildSkillsSummary() string {
+func (sl *SkillsLoader) BuildDynamicSkillsSummary(currentMessage, channel string) string {
 	allSkills := sl.ListSkills()
 	if len(allSkills) == 0 {
 		return ""
 	}
 
+	selectedSkills := sl.router.ResolveSkills(currentMessage, channel, allSkills)
+
 	var lines []string
 	lines = append(lines, "<skills>")
-	for _, s := range allSkills {
+	for _, s := range selectedSkills {
 		escapedName := escapeXML(s.Name)
 		escapedDesc := escapeXML(s.Description)
 		escapedPath := escapeXML(s.Path)
@@ -201,6 +205,10 @@ func (sl *SkillsLoader) BuildSkillsSummary() string {
 	lines = append(lines, "</skills>")
 
 	return strings.Join(lines, "\n")
+}
+
+func (sl *SkillsLoader) BuildSkillsSummary() string {
+	return sl.BuildDynamicSkillsSummary("", "")
 }
 
 func (sl *SkillsLoader) getSkillMetadata(skillPath string) *SkillMetadata {

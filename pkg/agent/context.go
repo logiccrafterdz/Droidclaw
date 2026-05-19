@@ -106,7 +106,7 @@ func (cb *ContextBuilder) buildToolsSection() string {
 	return sb.String()
 }
 
-func (cb *ContextBuilder) BuildSystemPrompt() string {
+func (cb *ContextBuilder) BuildSystemPrompt(currentMessage, channel string) string {
 	parts := []string{}
 
 	// Core identity section
@@ -118,8 +118,8 @@ func (cb *ContextBuilder) BuildSystemPrompt() string {
 		parts = append(parts, bootstrapContent)
 	}
 
-	// Skills - show summary, AI can read full content with read_file tool
-	skillsSummary := cb.skillsLoader.BuildSkillsSummary()
+	// Skills - dynamically loaded based on message and channel context
+	skillsSummary := cb.skillsLoader.BuildDynamicSkillsSummary(currentMessage, channel)
 	if skillsSummary != "" {
 		parts = append(parts, fmt.Sprintf(`# Skills
 
@@ -160,7 +160,7 @@ func (cb *ContextBuilder) LoadBootstrapFiles() string {
 func (cb *ContextBuilder) BuildMessages(history []providers.Message, summary string, currentMessage string, media []string, channel, chatID string) []providers.Message {
 	messages := []providers.Message{}
 
-	systemPrompt := cb.BuildSystemPrompt()
+	systemPrompt := cb.BuildSystemPrompt(currentMessage, channel)
 
 	// Add Current Session info if provided
 	if channel != "" && chatID != "" {
