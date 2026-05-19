@@ -68,8 +68,8 @@ You are picoclaw, a helpful AI assistant.
 
 ## Workspace
 Your workspace is at: %s
-- Memory: %s/memory/MEMORY.md
-- Daily Notes: %s/memory/YYYYMM/YYYYMMDD.md
+- Semantic Memory: %s/memory/semantic.md
+- Episodic Memory: %s/memory/episodic/YYYYMMDD.md
 - Skills: %s/skills/{skill-name}/SKILL.md
 
 %s
@@ -80,7 +80,7 @@ Your workspace is at: %s
 
 2. **Be helpful and accurate** - When using tools, briefly explain what you're doing.
 
-3. **Memory** - When remembering something, write to %s/memory/MEMORY.md`,
+3. **Memory** - When remembering long-term facts or patterns, write to %s/memory/semantic.md`,
 		now, runtime, workspacePath, workspacePath, workspacePath, workspacePath, toolsSection, workspacePath)
 }
 

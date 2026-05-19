@@ -212,6 +212,24 @@ func (sl *SkillsLoader) BuildSkillsSummary() string {
 }
 
 func (sl *SkillsLoader) getSkillMetadata(skillPath string) *SkillMetadata {
+	skillDir := filepath.Dir(skillPath)
+	genomePath := filepath.Join(skillDir, "genome.json")
+
+	// 1. Try to load from genome.json first (Skill Genome Idea 2)
+	if genomeData, err := os.ReadFile(genomePath); err == nil {
+		var genomeMeta struct {
+			Name        string `json:"name"`
+			Description string `json:"description"`
+		}
+		if err := json.Unmarshal(genomeData, &genomeMeta); err == nil {
+			return &SkillMetadata{
+				Name:        genomeMeta.Name,
+				Description: genomeMeta.Description,
+			}
+		}
+	}
+
+	// 2. Fallback to SKILL.md frontmatter
 	content, err := os.ReadFile(skillPath)
 	if err != nil {
 		return nil
@@ -220,11 +238,11 @@ func (sl *SkillsLoader) getSkillMetadata(skillPath string) *SkillMetadata {
 	frontmatter := sl.extractFrontmatter(string(content))
 	if frontmatter == "" {
 		return &SkillMetadata{
-			Name: filepath.Base(filepath.Dir(skillPath)),
+			Name: filepath.Base(skillDir),
 		}
 	}
 
-	// Try JSON first (for backward compatibility)
+	// Try JSON frontmatter (for backward compatibility)
 	var jsonMeta struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`

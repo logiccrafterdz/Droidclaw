@@ -13,51 +13,62 @@ import (
 	"time"
 )
 
-// MemoryStore manages persistent memory for the agent.
-// - Long-term memory: memory/MEMORY.md
-// - Daily notes: memory/YYYYMM/YYYYMMDD.md
+// MemoryStore manages persistent multi-tier neural memory for the agent.
+// - Semantic Memory: memory/semantic.md (Rules, patterns, persistent facts)
+// - Episodic Memory: memory/episodic/YYYYMMDD.md (Daily observations, chronological events)
+// - Working Memory is handled by SessionManager.
 type MemoryStore struct {
-	workspace  string
-	memoryDir  string
-	memoryFile string
+	workspace   string
+	memoryDir   string
+	semanticFile string
+	episodicDir  string
 }
 
 // NewMemoryStore creates a new MemoryStore with the given workspace path.
 // It ensures the memory directory exists.
 func NewMemoryStore(workspace string) *MemoryStore {
 	memoryDir := filepath.Join(workspace, "memory")
-	memoryFile := filepath.Join(memoryDir, "MEMORY.md")
+	semanticFile := filepath.Join(memoryDir, "semantic.md")
+	episodicDir := filepath.Join(memoryDir, "episodic")
 
-	// Ensure memory directory exists
+	// Ensure memory directories exist
 	os.MkdirAll(memoryDir, 0755)
+	os.MkdirAll(episodicDir, 0755)
+
+	// Migrate old MEMORY.md to semantic.md if exists
+	oldMemoryFile := filepath.Join(memoryDir, "MEMORY.md")
+	if _, err := os.Stat(oldMemoryFile); err == nil {
+		if _, err := os.Stat(semanticFile); os.IsNotExist(err) {
+			os.Rename(oldMemoryFile, semanticFile)
+		}
+	}
 
 	return &MemoryStore{
-		workspace:  workspace,
-		memoryDir:  memoryDir,
-		memoryFile: memoryFile,
+		workspace:   workspace,
+		memoryDir:   memoryDir,
+		semanticFile: semanticFile,
+		episodicDir:  episodicDir,
 	}
 }
 
-// getTodayFile returns the path to today's daily note file (memory/YYYYMM/YYYYMMDD.md).
+// getTodayFile returns the path to today's episodic memory file.
 func (ms *MemoryStore) getTodayFile() string {
 	today := time.Now().Format("20060102")      // YYYYMMDD
-	monthDir := today[:6]                       // YYYYMM
-	filePath := filepath.Join(ms.memoryDir, monthDir, today+".md")
+	filePath := filepath.Join(ms.episodicDir, today+".md")
 	return filePath
 }
 
-// ReadLongTerm reads the long-term memory (MEMORY.md).
-// Returns empty string if the file doesn't exist.
-func (ms *MemoryStore) ReadLongTerm() string {
-	if data, err := os.ReadFile(ms.memoryFile); err == nil {
+// ReadSemantic reads the semantic memory (semantic.md).
+func (ms *MemoryStore) ReadSemantic() string {
+	if data, err := os.ReadFile(ms.semanticFile); err == nil {
 		return string(data)
 	}
 	return ""
 }
 
-// WriteLongTerm writes content to the long-term memory file (MEMORY.md).
-func (ms *MemoryStore) WriteLongTerm(content string) error {
-	return os.WriteFile(ms.memoryFile, []byte(content), 0644)
+// WriteSemantic writes content to the semantic memory file.
+func (ms *MemoryStore) WriteSemantic(content string) error {
+	return os.WriteFile(ms.semanticFile, []byte(content), 0644)
 }
 
 // ReadToday reads today's daily note.
@@ -97,16 +108,14 @@ func (ms *MemoryStore) AppendToday(content string) error {
 	return os.WriteFile(todayFile, []byte(newContent), 0644)
 }
 
-// GetRecentDailyNotes returns daily notes from the last N days.
-// Contents are joined with "---" separator.
-func (ms *MemoryStore) GetRecentDailyNotes(days int) string {
+// GetRecentEpisodic returns episodic memories from the last N days.
+func (ms *MemoryStore) GetRecentEpisodic(days int) string {
 	var notes []string
 
 	for i := 0; i < days; i++ {
 		date := time.Now().AddDate(0, 0, -i)
 		dateStr := date.Format("20060102")      // YYYYMMDD
-		monthDir := dateStr[:6]                 // YYYYMM
-		filePath := filepath.Join(ms.memoryDir, monthDir, dateStr+".md")
+		filePath := filepath.Join(ms.episodicDir, dateStr+".md")
 
 		if data, err := os.ReadFile(filePath); err == nil {
 			notes = append(notes, string(data))
@@ -129,20 +138,20 @@ func (ms *MemoryStore) GetRecentDailyNotes(days int) string {
 }
 
 // GetMemoryContext returns formatted memory context for the agent prompt.
-// Includes long-term memory and recent daily notes.
+// Includes semantic memory and recent episodic memory.
 func (ms *MemoryStore) GetMemoryContext() string {
 	var parts []string
 
-	// Long-term memory
-	longTerm := ms.ReadLongTerm()
-	if longTerm != "" {
-		parts = append(parts, "## Long-term Memory\n\n"+longTerm)
+	// Semantic Memory (Long-term concepts/rules)
+	semantic := ms.ReadSemantic()
+	if semantic != "" {
+		parts = append(parts, "## Semantic Memory (Rules, Patterns & Facts)\n\n"+semantic)
 	}
 
-	// Recent daily notes (last 3 days)
-	recentNotes := ms.GetRecentDailyNotes(3)
+	// Episodic Memory (Recent events)
+	recentNotes := ms.GetRecentEpisodic(3)
 	if recentNotes != "" {
-		parts = append(parts, "## Recent Daily Notes\n\n"+recentNotes)
+		parts = append(parts, "## Episodic Memory (Recent Events)\n\n"+recentNotes)
 	}
 
 	if len(parts) == 0 {

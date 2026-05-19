@@ -1,16 +1,16 @@
 ---
 name: update_scorer_weights
-description: Automatically adjust opportunity scoring weights based on historical hit rates from post_mortem reports. Ensures the agent dynamically prioritizes indicators that are currently performing best in the market.
+description: Automatically adjust opportunity scoring weights and evolve Skill Genomes based on historical hit rates. Ensures the agent dynamically prioritizes indicators that are currently performing best in the market.
 metadata: {"droidclaw":{"emoji":"⚖️","category":"economic","autonomous":true}}
 ---
 
-# Update Scorer Weights
+# Adaptive Skill Evolution & Weights Update
 
-Dynamically optimize the weight of each analytical component based on its real-world performance.
+Dynamically optimize the weight of each analytical component based on its real-world performance, and maintain the Skill Genome for self-improvement.
 
 ## When to Use
-- Called automatically once per week (Sunday evening)
-- Can be triggered manually via "/updateweights" command
+- Called automatically via cron or post-mortem triggers.
+- Can be triggered manually via "/updateweights" command.
 
 ## Procedure
 
@@ -23,7 +23,7 @@ Dynamically optimize the weight of each analytical component based on its real-w
    - Get the category-specific hit rate.
    - Requirement: Minimum 5 observations in the category to trigger adjustment.
 
-3. **Apply Incremental Adjustments**:
+3. **Apply Incremental Adjustments (Weights)**:
    - **Performance > 65%**: Increase weight by `+0.02`.
    - **Performance < 45%**: Decrease weight by `-0.02`.
    - **Performance 45%-65%**: No change (stability zone).
@@ -34,22 +34,30 @@ Dynamically optimize the weight of each analytical component based on its real-w
 
 5. **Update Weights File**: Use `storage` tool to write new values to `scoring/weights.json`.
 
-6. **Log the Change**: Use `storage` to append the change log to `scoring/weights_log.json`:
-   ```json
-   {
-     "timestamp": "2026-02-12T13:00:00Z",
-     "adjustments": {
-       "macro_trigger": "+0.02",
-       "volatility_signal": "-0.02"
-     },
-     "reasoning": "Macro hit rate at 72% over last 10 samples; Volatility hit rate dropped to 40%."
-   }
-   ```
+6. **Skill Genome Evolution (Idea 2)**:
+   For every skill that corresponds to an adjusted weight (e.g., `trend_regime_filter` for Trend, `volatility_noise_filter` for Volatility):
+   - Read its `genome.json` file in the workspace's `skills/<skill_name>/` directory (create one if it doesn't exist).
+   - Update the `"performance"` metrics inside `genome.json` with the latest hit rate.
+   - Example `genome.json` structure:
+     ```json
+     {
+       "name": "trend_regime_filter",
+       "version": "1.0.0",
+       "performance": {
+         "hit_rate": 0.68,
+         "total_observations": 12
+       },
+       "dependencies": ["market_data"]
+     }
+     ```
+   - Use the `storage` or `write_file` tool to save the updated `genome.json`.
 
-7. **Notify on Significant Shifts**: If any weight changes by more than 10% total, send a brief message to Telegram.
+7. **Log the Change**: Use `storage` to append the change log to `scoring/weights_log.json`.
+
+8. **Notify on Significant Shifts**: If any weight changes by more than 10% total, send a brief message via `message` tool.
 
 ## Safety Rules
-- Adjustments MUST be small (max +/- 0.05 per week).
+- Adjustments MUST be small (max +/- 0.05 per session).
 - Total sum of weights MUST always be 1.0.
 - Never set a weight to 0.0 (all analytical components must contribute).
-- All changes are "for informational purposes and internal optimization only".
+- Genomes are critical for the agent's long-term self-awareness; keep JSON structures strict.
