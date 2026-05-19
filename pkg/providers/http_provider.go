@@ -14,6 +14,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/sipeed/picoclaw/pkg/config"
 )
@@ -29,7 +30,7 @@ func NewHTTPProvider(apiKey, apiBase string) *HTTPProvider {
 		apiKey:  apiKey,
 		apiBase: apiBase,
 		httpClient: &http.Client{
-			Timeout: 0,
+			Timeout: 120 * time.Second,
 		},
 	}
 }

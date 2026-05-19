@@ -63,6 +63,7 @@ type CronService struct {
 	mu        sync.RWMutex
 	running   bool
 	stopChan  chan struct{}
+	wakeChan  chan struct{}
 	gronx     *gronx.Gronx
 }
 
@@ -71,6 +72,7 @@ func NewCronService(storePath string, onJob JobHandler) *CronService {
 		storePath: storePath,
 		onJob:     onJob,
 		stopChan:  make(chan struct{}),
+		wakeChan:  make(chan struct{}, 1),
 		gronx:     gronx.New(),
 	}
 	// Initialize and load store on creation
@@ -113,15 +115,48 @@ func (cs *CronService) Stop() {
 	close(cs.stopChan)
 }
 
-func (cs *CronService) runLoop() {
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
+func (cs *CronService) triggerWake() {
+	select {
+	case cs.wakeChan <- struct{}{}:
+	default:
+	}
+}
 
+func (cs *CronService) runLoop() {
 	for {
+		cs.mu.RLock()
+		nextWake := cs.getNextWakeMS()
+		cs.mu.RUnlock()
+
+		var timer *time.Timer
+		var timerC <-chan time.Time
+
+		if nextWake != nil {
+			now := time.Now().UnixMilli()
+			sleepMS := *nextWake - now
+			if sleepMS <= 0 {
+				sleepMS = 10 // avoid busy looping
+			}
+			timer = time.NewTimer(time.Duration(sleepMS) * time.Millisecond)
+			timerC = timer.C
+		} else {
+			// No jobs scheduled, sleep until triggered
+			timerC = nil
+		}
+
 		select {
 		case <-cs.stopChan:
+			if timer != nil {
+				timer.Stop()
+			}
 			return
-		case <-ticker.C:
+		case <-cs.wakeChan:
+			if timer != nil {
+				timer.Stop()
+			}
+			// State changed, re-evaluate
+			continue
+		case <-timerC:
 			cs.checkJobs()
 		}
 	}
@@ -355,6 +390,7 @@ func (cs *CronService) AddJob(name string, schedule CronSchedule, message string
 		return nil, err
 	}
 
+	cs.triggerWake()
 	return &job, nil
 }
 
@@ -380,6 +416,7 @@ func (cs *CronService) removeJobUnsafe(jobID string) bool {
 		if err := cs.saveStoreUnsafe(); err != nil {
 			log.Printf("[cron] failed to save store after remove: %v", err)
 		}
+		cs.triggerWake()
 	}
 
 	return removed
@@ -404,6 +441,7 @@ func (cs *CronService) EnableJob(jobID string, enabled bool) *CronJob {
 			if err := cs.saveStoreUnsafe(); err != nil {
 				log.Printf("[cron] failed to save store after enable: %v", err)
 			}
+			cs.triggerWake()
 			return job
 		}
 	}

@@ -25,9 +25,10 @@ type AvailableSkill struct {
 }
 
 type BuiltinSkill struct {
-	Name    string `json:"name"`
-	Path    string `json:"path"`
-	Enabled bool   `json:"enabled"`
+	Name        string `json:"name"`
+	Path        string `json:"path"`
+	Description string `json:"description"`
+	Enabled     bool   `json:"enabled"`
 }
 
 func NewSkillInstaller(workspace string) *SkillInstaller {
@@ -135,7 +136,6 @@ func (si *SkillInstaller) ListBuiltinSkills() []BuiltinSkill {
 	var skills []BuiltinSkill
 	for _, entry := range entries {
 		if entry.IsDir() {
-			_ = entry
 			skillName := entry.Name()
 			skillFile := filepath.Join(builtinSkillsDir, skillName, "SKILL.md")
 
@@ -143,28 +143,22 @@ func (si *SkillInstaller) ListBuiltinSkills() []BuiltinSkill {
 			description := ""
 			if err == nil {
 				content := string(data)
-				if idx := strings.Index(content, "\n"); idx > 0 {
-					firstLine := content[:idx]
-					if strings.Contains(firstLine, "description:") {
-						descLine := strings.Index(content[idx:], "\n")
-						if descLine > 0 {
-							description = strings.TrimSpace(content[idx+descLine : idx+descLine])
-						}
+				lines := strings.Split(content, "\n")
+				for _, line := range lines {
+					if strings.HasPrefix(line, "description:") {
+						description = strings.TrimSpace(strings.TrimPrefix(line, "description:"))
+						break
 					}
 				}
 			}
 
-			// skill := BuiltinSkill{
-			// 	Name:    skillName,
-			// 	Path:    description,
-			// 	Enabled: true,
-			// }
-
-			status := "✓"
-			fmt.Printf("  %s  %s\n", status, entry.Name())
-			if description != "" {
-				fmt.Printf("    %s\n", description)
+			skill := BuiltinSkill{
+				Name:        skillName,
+				Path:        skillFile,
+				Description: description,
+				Enabled:     true,
 			}
+			skills = append(skills, skill)
 		}
 	}
 	return skills

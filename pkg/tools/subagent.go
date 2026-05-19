@@ -2,7 +2,9 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,16 +29,16 @@ type SubagentManager struct {
 	provider  providers.LLMProvider
 	bus       *bus.MessageBus
 	workspace string
-	nextID    int
+	registry  *ToolRegistry
 }
 
-func NewSubagentManager(provider providers.LLMProvider, workspace string, bus *bus.MessageBus) *SubagentManager {
+func NewSubagentManager(provider providers.LLMProvider, workspace string, bus *bus.MessageBus, registry *ToolRegistry) *SubagentManager {
 	return &SubagentManager{
 		tasks:     make(map[string]*SubagentTask),
 		provider:  provider,
 		bus:       bus,
 		workspace: workspace,
-		nextID:    1,
+		registry:  registry,
 	}
 }
 
@@ -44,8 +46,7 @@ func (sm *SubagentManager) Spawn(ctx context.Context, task, label, originChannel
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	taskID := fmt.Sprintf("subagent-%d", sm.nextID)
-	sm.nextID++
+	taskID := fmt.Sprintf("subagent-%d", time.Now().UnixNano())
 
 	subagentTask := &SubagentTask{
 		ID:            taskID,
@@ -73,7 +74,7 @@ func (sm *SubagentManager) runTask(ctx context.Context, task *SubagentTask) {
 	messages := []providers.Message{
 		{
 			Role:    "system",
-			Content: "You are a subagent. Complete the given task independently and report the result.",
+			Content: "You are a subagent. Complete the given task independently and report the result. You have access to tools. Use them to gather information and perform actions.",
 		},
 		{
 			Role:    "user",
@@ -81,20 +82,89 @@ func (sm *SubagentManager) runTask(ctx context.Context, task *SubagentTask) {
 		},
 	}
 
-	response, err := sm.provider.Chat(ctx, messages, nil, sm.provider.GetDefaultModel(), map[string]interface{}{
-		"max_tokens": 4096,
-	})
+	maxIterations := 10
+	iteration := 0
+	var finalResult string
+
+	for iteration < maxIterations {
+		iteration++
+		
+		var providerToolDefs []providers.ToolDefinition
+		if sm.registry != nil {
+			toolDefs := sm.registry.GetDefinitions()
+			for _, td := range toolDefs {
+				funcMap := td["function"].(map[string]interface{})
+				if funcMap["name"].(string) == "spawn" {
+					continue
+				}
+				providerToolDefs = append(providerToolDefs, providers.ToolDefinition{
+					Type: td["type"].(string),
+					Function: providers.ToolFunctionDefinition{
+						Name:        funcMap["name"].(string),
+						Description: funcMap["description"].(string),
+						Parameters:  funcMap["parameters"].(map[string]interface{}),
+					},
+				})
+			}
+		}
+
+		response, err := sm.provider.Chat(ctx, messages, providerToolDefs, sm.provider.GetDefaultModel(), map[string]interface{}{
+			"max_tokens": 4096,
+		})
+
+		if err != nil {
+			finalResult = fmt.Sprintf("Error: %v", err)
+			break
+		}
+
+		if len(response.ToolCalls) == 0 {
+			finalResult = response.Content
+			break
+		}
+
+		assistantMsg := providers.Message{
+			Role:    "assistant",
+			Content: response.Content,
+		}
+		for _, tc := range response.ToolCalls {
+			argsJSON, _ := json.Marshal(tc.Arguments)
+			assistantMsg.ToolCalls = append(assistantMsg.ToolCalls, providers.ToolCall{
+				ID:   tc.ID,
+				Type: "function",
+				Function: &providers.FunctionCall{
+					Name:      tc.Name,
+					Arguments: string(argsJSON),
+				},
+			})
+		}
+		messages = append(messages, assistantMsg)
+
+		for _, tc := range response.ToolCalls {
+			result, err := sm.registry.ExecuteWithContext(ctx, tc.Name, tc.Arguments, task.OriginChannel, task.OriginChatID)
+			if err != nil {
+				result = fmt.Sprintf("Error: %v", err)
+			}
+			messages = append(messages, providers.Message{
+				Role:       "tool",
+				Content:    result,
+				ToolCallID: tc.ID,
+			})
+		}
+	}
+
+	if iteration >= maxIterations && finalResult == "" {
+		finalResult = "Error: Max iterations reached without a final answer."
+	}
 
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	if err != nil {
+	if strings.HasPrefix(finalResult, "Error:") {
 		task.Status = "failed"
-		task.Result = fmt.Sprintf("Error: %v", err)
 	} else {
 		task.Status = "completed"
-		task.Result = response.Content
 	}
+	task.Result = finalResult
 
 	// Send announce message back to main agent
 	if sm.bus != nil {

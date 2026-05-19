@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -154,7 +155,8 @@ func (sm *SessionManager) Save(session *Session) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	sessionPath := filepath.Join(sm.storage, session.Key+".json")
+	safeKey := strings.ReplaceAll(session.Key, ":", "_")
+	sessionPath := filepath.Join(sm.storage, safeKey+".json")
 
 	data, err := json.MarshalIndent(session, "", "  ")
 	if err != nil {
